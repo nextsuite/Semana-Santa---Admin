@@ -13,7 +13,8 @@ import {
     Users,
     Bell,
     MonitorPlay,
-    Settings
+    Settings,
+    MapPin
 } from 'lucide-react';
 
 const mainNavigation = [
@@ -24,6 +25,7 @@ const mainNavigation = [
 ];
 
 const bottomNavigation = [
+    { name: 'Dispositivos GPS', href: '/gps', icon: MapPin },
     { name: 'Días', href: '/dias', icon: Calendar },
     { name: 'Configuración', href: '/configuracion', icon: Settings },
 ];

@@ -11,7 +11,8 @@ import {
     ChevronLeft,
     ChevronRight,
     MonitorPlay,
-    Settings
+    Settings,
+    MapPin
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const mainNavigation = [
 ];
 
 const bottomNavigation = [
+    { name: 'Dispositivos GPS', href: '/gps', icon: MapPin },
     { name: 'Días', href: '/dias', icon: Calendar },
     { name: 'Configuración', href: '/configuracion', icon: Settings },
 ];
