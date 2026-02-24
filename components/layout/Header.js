@@ -32,6 +32,7 @@ export default function Header({ onMobileMenuClick }) {
             </div>
 
             <div className="flex items-center space-x-4">
+                <span className="hidden sm:inline-block text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-md border border-border">v1.0.0</span>
                 {/* User Dropdown */}
                 <Menu as="div" className="relative ml-3">
                     <div>
