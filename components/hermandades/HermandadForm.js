@@ -16,6 +16,7 @@ export default function HermandadForm({ initialData = {} }) {
   const [loading, setLoading] = useState(false);
   const { pb } = useAuth();
   const [dias, setDias] = useState([]);
+  const [dispositivosGps, setDispositivosGps] = useState([]);
 
   const [formData, setFormData] = useState({
     nombre: initialData.nombre || '',
@@ -25,6 +26,7 @@ export default function HermandadForm({ initialData = {} }) {
     dia_id: initialData.dia_id || '',
     estado: initialData.estado || 'programada',
     retraso_minutos: initialData.retraso_minutos || 0,
+    dispositivo_gps: initialData.dispositivo_gps || '',
     fundacion: initialData.fundacion || '',
     hermano_mayor: initialData.hermano_mayor || '',
     escudo: null,
@@ -32,18 +34,20 @@ export default function HermandadForm({ initialData = {} }) {
   });
 
   useEffect(() => {
-    // Load days for the select dropdown
-    const loadDias = async () => {
+    // Load days and GPS devices for the select dropdowns
+    const loadData = async () => {
       try {
-        const records = await pb.collection('dias_semana_santa').getFullList({
-          sort: 'orden',
-        });
-        setDias(records);
+        const [diasRecords, gpsRecords] = await Promise.all([
+          pb.collection('dias_semana_santa').getFullList({ sort: 'orden' }),
+          pb.collection('dispositivos_gps').getFullList({ sort: 'nombre' })
+        ]);
+        setDias(diasRecords);
+        setDispositivosGps(gpsRecords);
       } catch (err) {
-        console.error('Error loading dias:', err);
+        console.error('Error loading form data:', err);
       }
     };
-    loadDias();
+    loadData();
   }, []);
 
   const handleChange = (e) => {
@@ -204,6 +208,22 @@ export default function HermandadForm({ initialData = {} }) {
               value={formData.retraso_minutos}
               onChange={handleChange}
             />
+          </div>
+
+          <div className="sm:col-span-4">
+            <label className="block text-sm font-medium text-foreground mb-1.5">Dispositivo GPS</label>
+            <Select
+              name="dispositivo_gps"
+              value={formData.dispositivo_gps}
+              onChange={handleChange}
+            >
+              <option value="">Sin GPS asignado</option>
+              {dispositivosGps.map((gps) => (
+                <option key={gps.id} value={gps.id}>
+                  {gps.nombre} - {gps.device_id} {!gps.activo && '(Inactivo)'}
+                </option>
+              ))}
+            </Select>
           </div>
         </CardContent>
       </Card>
