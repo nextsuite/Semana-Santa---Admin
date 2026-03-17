@@ -13,6 +13,7 @@ export default function ConfiguracionPage() {
     const [saving, setSaving] = useState(false);
     const [configId, setConfigId] = useState(null);
     const [mapaGps, setMapaGps] = useState(false);
+    const [colaboracionAyto, setColaboracionAyto] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const { pb } = useAuth();
@@ -33,10 +34,12 @@ export default function ConfiguracionPage() {
                 const config = records.items[0];
                 setConfigId(config.id);
                 setMapaGps(config.mapa_gps || false);
+                setColaboracionAyto(config.colaboracion_ayto || false);
             } else {
                 // No configuration exists yet
                 setConfigId(null);
                 setMapaGps(false);
+                setColaboracionAyto(false);
             }
         } catch (err) {
             console.error('Error loading configuration:', err);
@@ -57,7 +60,8 @@ export default function ConfiguracionPage() {
 
         try {
             const data = {
-                mapa_gps: mapaGps
+                mapa_gps: mapaGps,
+                colaboracion_ayto: colaboracionAyto
             };
 
             if (configId) {
@@ -109,6 +113,26 @@ export default function ConfiguracionPage() {
                                         type="checkbox"
                                         checked={mapaGps}
                                         onChange={(e) => setMapaGps(e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                </label>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20 mt-4">
+                                <div className="space-y-0.5">
+                                    <label className="text-base font-medium text-foreground">
+                                        Colaboración Ayuntamiento
+                                    </label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Activa o desactiva la visualización de los logos del Ayuntamiento en la aplicación móvil.
+                                    </p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={colaboracionAyto}
+                                        onChange={(e) => setColaboracionAyto(e.target.checked)}
                                         className="sr-only peer"
                                     />
                                     <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>

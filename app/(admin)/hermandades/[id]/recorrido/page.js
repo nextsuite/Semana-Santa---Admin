@@ -11,14 +11,18 @@ import { Select } from '@/components/ui/Select';
 import { motion } from 'framer-motion';
 
 const TIPO_CONFIG = {
-    salida: { label: 'Salida', color: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500', icon: Flag },
-    punto: { label: 'Punto', color: 'bg-slate-100 text-slate-700 border-slate-300', dot: 'bg-slate-400', icon: MapPin },
-    carrera_oficial: { label: 'Carrera oficial', color: 'bg-amber-100 text-amber-700 border-amber-300', dot: 'bg-amber-500', icon: Star },
-    santa_cruz: { label: 'Santa Cruz', color: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500', icon: Cross },
-    entrada: { label: 'Entrada', color: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500', icon: Flag },
+    salida: { label: 'Salida', bgColor: 'bg-green-50/50', borderColor: 'border-green-200', dot: 'bg-green-500', textColor: 'text-green-700', icon: Flag },
+    punto: { label: 'Punto', bgColor: 'bg-card', borderColor: 'border-border', dot: 'bg-slate-400', textColor: 'text-slate-500', icon: MapPin },
+    carrera_oficial: { label: 'Carrera oficial', bgColor: 'bg-amber-50/50', borderColor: 'border-amber-200', dot: 'bg-amber-500', textColor: 'text-amber-700', icon: Star },
+    entrada_santa_cruz: { label: 'Entrada Santa Cruz', bgColor: 'bg-purple-50/50', borderColor: 'border-purple-200', dot: 'bg-purple-500', textColor: 'text-purple-700', icon: Cross },
+    salida_santa_cruz: { label: 'Salida Santa Cruz', bgColor: 'bg-indigo-50/50', borderColor: 'border-indigo-200', dot: 'bg-indigo-500', textColor: 'text-indigo-700', icon: Cross },
+    entrada: { label: 'Entrada', bgColor: 'bg-red-50/50', borderColor: 'border-red-200', dot: 'bg-red-500', textColor: 'text-red-700', icon: Flag },
 };
 
-const EMPTY_FORM = { punto: '', minutos: '', tipo: 'punto' };
+// Aliases for retro-compatibility
+TIPO_CONFIG.santa_cruz = TIPO_CONFIG.entrada_santa_cruz;
+
+const EMPTY_FORM = { punto: '', minutos: '', tipo: 'punto', zona_id: '' };
 
 export default function RecorridoPage({ params: paramsPromise }) {
     const params = use(paramsPromise);
@@ -26,6 +30,7 @@ export default function RecorridoPage({ params: paramsPromise }) {
 
     const [hermandad, setHermandad] = useState(null);
     const [puntos, setPuntos] = useState([]);
+    const [zonas, setZonas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editingPunto, setEditingPunto] = useState(null);
@@ -38,15 +43,21 @@ export default function RecorridoPage({ params: paramsPromise }) {
 
     const loadData = async () => {
         try {
-            const [hermandadRecord, puntosRecords] = await Promise.all([
-                pb.collection('hermandades').getOne(id),
+            const [hermandadRecord, puntosRecords, zonasRecords] = await Promise.all([
+                pb.collection('hermandades').getOne(id, { expand: 'lugar_salida' }),
                 pb.collection('recorridos').getFullList({
                     filter: `hermandad_id = "${id}"`,
                     sort: 'orden',
+                    expand: 'zona_id',
+                }),
+                pb.collection('zonas_geofencing').getFullList({
+                    filter: 'activo = true',
+                    sort: 'nombre',
                 }),
             ]);
             setHermandad(hermandadRecord);
             setPuntos(puntosRecords);
+            setZonas(zonasRecords);
         } catch (err) {
             console.error('Error loading data:', err);
         } finally {
@@ -65,12 +76,32 @@ export default function RecorridoPage({ params: paramsPromise }) {
             punto: punto.punto,
             minutos: punto.minutos,
             tipo: punto.tipo,
+            zona_id: punto.zona_id || '',
         });
     };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => {
+            const next = { ...prev, [name]: value };
+            
+            // Auto-select zone and name based on type
+            if (name === 'tipo') {
+                if (value === 'entrada' && hermandad?.lugar_salida) {
+                    next.zona_id = hermandad.lugar_salida;
+                } else if (value === 'entrada_santa_cruz') {
+                    next.punto = 'Entrada Santa Cruz';
+                    // Find Santa Cruz zone ID
+                    const scZone = zonas.find(z => z.nombre.toLowerCase().includes('santa cruz'));
+                    if (scZone) next.zona_id = scZone.id;
+                } else if (value === 'salida_santa_cruz') {
+                    next.punto = 'Salida Santa Cruz';
+                    next.zona_id = '';
+                }
+            }
+            
+            return next;
+        });
     };
 
     const handleSubmit = async (e) => {
@@ -83,6 +114,7 @@ export default function RecorridoPage({ params: paramsPromise }) {
                 minutos: parseInt(formData.minutos) || 0,
                 tipo: formData.tipo,
                 hermandad_id: id,
+                zona_id: formData.zona_id || null,
             };
 
             // Always create new
@@ -131,6 +163,16 @@ export default function RecorridoPage({ params: paramsPromise }) {
         } catch (error) {
             console.error('Error update:', error);
             alert('Error al actualizar');
+        }
+    };
+
+    const handleUpdateHermandad = async (data) => {
+        try {
+            await pb.collection('hermandades').update(id, data);
+            await loadData();
+        } catch (error) {
+            console.error('Error update hermandad:', error);
+            alert('Error al actualizar la configuración de la hermandad');
         }
     };
 
@@ -191,6 +233,47 @@ export default function RecorridoPage({ params: paramsPromise }) {
                 </p>
             </div>
 
+            {/* GPS Config Card */}
+            <Card className="mb-6 border-blue-200 bg-blue-50/30">
+                <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-foreground">Activar GPS</label>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={hermandad.activar_gps || false}
+                                    onChange={(e) => handleUpdateHermandad({ activar_gps: e.target.checked })}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-medium text-foreground">Hito actual (GPS)</label>
+                        <div className="flex items-center border rounded-md overflow-hidden bg-background">
+                            <button 
+                                onClick={() => handleUpdateHermandad({ gps_hito_actual: Math.max(0, (hermandad.gps_hito_actual || 0) - 1) })}
+                                className="px-3 py-1 bg-muted/50 hover:bg-muted font-bold text-foreground transition-colors"
+                            >
+                                -
+                            </button>
+                            <div className="px-4 py-1 font-mono font-semibold text-center min-w-[3rem]">
+                                {hermandad.gps_hito_actual || 0}
+                            </div>
+                            <button 
+                                onClick={() => handleUpdateHermandad({ gps_hito_actual: (hermandad.gps_hito_actual || 0) + 1 })}
+                                className="px-3 py-1 bg-muted/50 hover:bg-muted font-bold text-foreground transition-colors"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 {/* Left: Timeline */}
                 <div className="lg:col-span-3 space-y-4">
@@ -213,17 +296,23 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="text-xs font-mono text-muted-foreground w-5 text-right flex-shrink-0">0.</span>
-                                                <span className="font-medium text-foreground truncate">{hermandad.lugar_salida || 'Lugar de salida no definido'}</span>
+                                                <span className="font-medium text-foreground truncate">{hermandad.expand?.lugar_salida?.nombre || 'Lugar de salida no definido'}</span>
                                             </div>
                                             <span className="px-2 py-0.5 rounded text-[10px] font-medium border bg-green-100 text-green-700 border-green-300">
                                                 Salida
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1 font-semibold text-green-700">
                                                 <Clock className="w-3 h-3" />
                                                 {hermandad.hora_salida || '--:--'}
                                             </span>
+                                            {hermandad.expand?.lugar_salida && (
+                                                <div className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1 font-medium">
+                                                    <Map className="w-3 h-3" />
+                                                    {hermandad.expand.lugar_salida.nombre}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -238,6 +327,7 @@ export default function RecorridoPage({ params: paramsPromise }) {
 
                                 const isEditingMinutes = editingPunto?.id === punto.id && editingPunto?.field === 'minutos';
                                 const isEditingName = editingPunto?.id === punto.id && editingPunto?.field === 'nombre';
+                                const isEditingZone = editingPunto?.id === punto.id && editingPunto?.field === 'zona';
 
                                 return (
                                     <motion.div
@@ -251,14 +341,14 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                             <Icon className="w-5 h-5 text-white" />
                                         </div>
 
-                                        <div className={`flex-1 min-w-0`}>
-                                            <div className={`px-4 py-3 rounded-xl border bg-card border-border shadow-sm flex flex-col sm:flex-row sm:items-center gap-3`}>
+                                        <div className={`flex-1 min-w-0 ${punto.completado ? 'opacity-60 saturate-50' : ''}`}>
+                                            <div className={`px-4 py-3 rounded-xl border ${conf.bgColor} ${conf.borderColor} shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 transition-all`}>
 
                                                 {/* Left: Info */}
                                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded opacity-50">{punto.orden}</span>
-                                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${conf.color.replace('bg-', 'text-').replace('border-', 'text-')} opacity-70`}>{conf.label}</span>
+                                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${conf.textColor} opacity-70`}>{conf.label}</span>
                                                     </div>
 
                                                     {isEditingName ? (
@@ -279,12 +369,51 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                                             </Button>
                                                         </div>
                                                     ) : (
-                                                        <div
-                                                            className="font-semibold text-lg text-foreground truncate cursor-pointer hover:text-primary transition-colors flex items-center gap-2 group/name"
-                                                            onClick={() => setEditingPunto({ id: punto.id, field: 'nombre', value: punto.punto })}
-                                                        >
-                                                            {punto.punto}
-                                                            <Edit2 className="w-3.5 h-3.5 text-amber-500 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <div
+                                                                    className="font-semibold text-lg text-foreground truncate cursor-pointer hover:text-primary transition-colors flex items-center gap-2 group/name"
+                                                                    onClick={() => setEditingPunto({ id: punto.id, field: 'nombre', value: punto.punto })}
+                                                                >
+                                                                    {punto.punto}
+                                                                    <Edit2 className="w-3.5 h-3.5 text-amber-500 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                                                                </div>
+                                                                 {punto.tipo !== 'salida_santa_cruz' && (
+                                                                    isEditingZone ? (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Select
+                                                                                autoFocus
+                                                                                className="h-7 text-xs py-0 w-40"
+                                                                                value={editingPunto.value}
+                                                                                onChange={(e) => handleUpdate(punto.id, { zona_id: e.target.value || null })}
+                                                                                onBlur={() => setEditingPunto(null)}
+                                                                            >
+                                                                                <option value="">Sin zona</option>
+                                                                                {zonas.map(z => (
+                                                                                    <option key={z.id} value={z.id}>{z.nombre}</option>
+                                                                                ))}
+                                                                            </Select>
+                                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingPunto(null)}>
+                                                                                <X className="w-3 h-3" />
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                // Prevent editing for entrada_santa_cruz and entrada
+                                                                                if (['entrada', 'entrada_santa_cruz'].includes(punto.tipo)) return;
+                                                                                setEditingPunto({ id: punto.id, field: 'zona', value: punto.zona_id || '' });
+                                                                            }}
+                                                                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1 font-medium ${punto.zona_id
+                                                                                ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                                                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'} ${['entrada', 'entrada_santa_cruz'].includes(punto.tipo) ? 'cursor-default' : 'cursor-pointer'}`}
+                                                                        >
+                                                                            <Map className="w-3 h-3" />
+                                                                            {punto.expand?.zona_id?.nombre || 'Sin zona'}
+                                                                        </button>
+                                                                    )
+                                                                 )}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -342,6 +471,16 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                                         </div>
                                                     </div>
 
+                                                    {/* Completado Toggle */}
+                                                    <Button
+                                                        variant="ghost" size="icon"
+                                                        onClick={() => handleUpdate(punto.id, { completado: !punto.completado })}
+                                                        className={`h-8 w-8 ${punto.completado ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-muted-foreground/40 hover:text-green-600 hover:bg-green-50'}`}
+                                                        title={punto.completado ? 'Marcar como no completado' : 'Marcar como completado'}
+                                                    >
+                                                        {punto.completado ? <Check className="w-5 h-5" /> : <div className="w-4 h-4 rounded-full border-2 border-current" />}
+                                                    </Button>
+
                                                     {/* Delete */}
                                                     <Button
                                                         variant="ghost" size="icon"
@@ -389,13 +528,27 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                 <form onSubmit={handleSubmit} className="space-y-5">
                                     {/* Inputs... */}
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground mb-1.5">Nombre del punto</label>
+                                        <label className="block text-sm font-medium text-foreground mb-1.5">Tipo de punto</label>
+                                        <Select name="tipo" value={formData.tipo} onChange={handleChange}>
+                                            <option value="punto">Punto intermedio</option>
+                                            <option value="carrera_oficial">Carrera oficial</option>
+                                            <option value="entrada_santa_cruz">Entrada Santa Cruz</option>
+                                            <option value="salida_santa_cruz">Salida Santa Cruz</option>
+                                            <option value="entrada">Entrada</option>
+                                        </Select>
+                                    </div>
+
+                                    <div>
+                                        <label className={`block text-sm font-medium mb-1.5 ${['entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                            Nombre del punto
+                                        </label>
                                         <Input
                                             name="punto"
                                             value={formData.punto}
                                             onChange={handleChange}
                                             placeholder="Ej: Plaza de San Francisco"
                                             required
+                                            disabled={['entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo)}
                                         />
                                     </div>
 
@@ -416,13 +569,30 @@ export default function RecorridoPage({ params: paramsPromise }) {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground mb-1.5">Tipo de punto</label>
-                                        <Select name="tipo" value={formData.tipo} onChange={handleChange}>
-                                            <option value="punto">Punto intermedio</option>
-                                            <option value="carrera_oficial">Carrera oficial</option>
-                                            <option value="santa_cruz">Santa Cruz</option>
-                                            <option value="entrada">Entrada</option>
+                                        <label className={`block text-sm font-medium mb-1.5 ${['entrada', 'entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                            Zona Geofencing {['entrada', 'entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo) ? '(Auto)' : '(Opcional)'}
+                                        </label>
+                                        <Select 
+                                            name="zona_id" 
+                                            value={formData.zona_id} 
+                                            onChange={handleChange}
+                                            disabled={['entrada', 'entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo)}
+                                            className={['entrada', 'entrada_santa_cruz', 'salida_santa_cruz'].includes(formData.tipo) ? 'bg-muted/50 opacity-80 cursor-not-allowed' : ''}
+                                        >
+                                            <option value="">Ninguna</option>
+                                            {zonas.map(z => (
+                                                <option key={z.id} value={z.id}>{z.nombre}</option>
+                                            ))}
                                         </Select>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {formData.tipo === 'entrada' 
+                                                ? 'Al ser entrada, se asigna automáticamente el lugar de salida.' 
+                                                : formData.tipo === 'entrada_santa_cruz'
+                                                ? 'Se asigna automáticamente la zona de Santa Cruz.'
+                                                : formData.tipo === 'salida_santa_cruz'
+                                                ? 'Sin zona asociada para el fin de CO.'
+                                                : 'Vincula este punto a una zona de mapa para detección automática.'}
+                                        </p>
                                     </div>
 
                                     <div className="flex gap-2 pt-2">

@@ -17,6 +17,7 @@ export default function HermandadForm({ initialData = {} }) {
   const { pb } = useAuth();
   const [dias, setDias] = useState([]);
   const [dispositivosGps, setDispositivosGps] = useState([]);
+  const [templos, setTemplos] = useState([]);
 
   const [formData, setFormData] = useState({
     nombre: initialData.nombre || '',
@@ -25,7 +26,7 @@ export default function HermandadForm({ initialData = {} }) {
     hora_salida: initialData.hora_salida || '',
     dia_id: initialData.dia_id || '',
     estado: initialData.estado || 'programada',
-    retraso_minutos: initialData.retraso_minutos || 0,
+    activar_gps: initialData.activar_gps || false,
     dispositivo_gps: initialData.dispositivo_gps || '',
     fundacion: initialData.fundacion || '',
     hermano_mayor: initialData.hermano_mayor || '',
@@ -34,15 +35,20 @@ export default function HermandadForm({ initialData = {} }) {
   });
 
   useEffect(() => {
-    // Load days and GPS devices for the select dropdowns
+    // Load days, GPS devices and temples for the select dropdowns
     const loadData = async () => {
       try {
-        const [diasRecords, gpsRecords] = await Promise.all([
+        const [diasRecords, gpsRecords, templosRecords] = await Promise.all([
           pb.collection('dias_semana_santa').getFullList({ sort: 'orden' }),
-          pb.collection('dispositivos_gps').getFullList({ sort: 'nombre' })
+          pb.collection('dispositivos_gps').getFullList({ sort: 'nombre' }),
+          pb.collection('zonas_geofencing').getFullList({ 
+            filter: 'es_templo = true',
+            sort: 'nombre' 
+          })
         ]);
         setDias(diasRecords);
         setDispositivosGps(gpsRecords);
+        setTemplos(templosRecords);
       } catch (err) {
         console.error('Error loading form data:', err);
       }
@@ -51,9 +57,11 @@ export default function HermandadForm({ initialData = {} }) {
   }, []);
 
   const handleChange = (e) => {
-    const { name, value, type, files } = e.target;
+    const { name, value, type, files, checked } = e.target;
     if (type === 'file') {
       setFormData((prev) => ({ ...prev, [name]: files[0] }));
+    } else if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -180,12 +188,20 @@ export default function HermandadForm({ initialData = {} }) {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-foreground mb-1.5">Lugar salida</label>
-            <Input
+            <label className="block text-sm font-medium text-foreground mb-1.5">Lugar salida (Templo)</label>
+            <Select
               name="lugar_salida"
               value={formData.lugar_salida}
               onChange={handleChange}
-            />
+              required
+            >
+              <option value="">Selecciona un templo</option>
+              {templos.map((templo) => (
+                <option key={templo.id} value={templo.id}>
+                  {templo.nombre}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="sm:col-span-2">
@@ -201,13 +217,19 @@ export default function HermandadForm({ initialData = {} }) {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-foreground mb-1.5">Retraso (minutos)</label>
-            <Input
-              type="number"
-              name="retraso_minutos"
-              value={formData.retraso_minutos}
-              onChange={handleChange}
-            />
+            <label className="block text-sm font-medium text-foreground mb-1.5">Activar GPS</label>
+            <div className="flex h-10 items-center">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="activar_gps"
+                  checked={formData.activar_gps}
+                  onChange={handleChange}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-muted rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
           </div>
 
           <div className="sm:col-span-4">

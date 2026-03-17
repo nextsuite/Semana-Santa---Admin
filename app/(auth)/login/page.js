@@ -20,12 +20,9 @@ export default function LoginPage() {
         e.preventDefault();
         setError('');
         setLoading(true);
-        alert('Intentando conectar a: ' + (pb?.baseUrl || 'URL no definida'));
-
 
         const result = await login(username, password);
         if (!result.success) {
-            alert('ERROR: ' + (result.error || 'Desconocido')); // Native alert
             setError(result.error || 'Credenciales incorrectas o error en el servidor.');
             setLoading(false);
         } else {

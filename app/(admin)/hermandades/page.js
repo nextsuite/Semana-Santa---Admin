@@ -24,7 +24,7 @@ export default function HermandadesPage() {
         try {
             const records = await pb.collection('hermandades').getFullList({
                 sort: 'created',
-                expand: 'dia_id',
+                expand: 'dia_id,lugar_salida',
             });
             setHermandades(records);
         } catch (err) {
@@ -199,10 +199,10 @@ export default function HermandadesPage() {
                                                 <Clock className="w-4 h-4 mr-2 text-muted-foreground" />
                                                 <span>{hermandad.hora_salida || '--:--'}</span>
                                             </div>
-                                            <div className="flex items-center max-w-[50%]" title={hermandad.lugar_salida}>
+                                            <div className="flex items-center max-w-[50%]" title={hermandad.expand?.lugar_salida?.nombre || 'Sin ubicación'}>
                                                 <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
                                                 <span className="truncate">
-                                                    {hermandad.lugar_salida || 'Sin ubicación'}
+                                                    {hermandad.expand?.lugar_salida?.nombre || 'Sin ubicación'}
                                                 </span>
                                             </div>
                                         </div>

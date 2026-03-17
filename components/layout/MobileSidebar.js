@@ -14,7 +14,9 @@ import {
     Bell,
     MonitorPlay,
     Settings,
-    MapPin
+    MapPin,
+    Map,
+    Info
 } from 'lucide-react';
 
 const mainNavigation = [
@@ -22,10 +24,12 @@ const mainNavigation = [
     { name: 'Hermandades', href: '/hermandades', icon: Users },
     { name: 'Alertas', href: '/alertas', icon: Bell },
     { name: 'Publicidad', href: '/publicidad', icon: MonitorPlay },
+    { name: 'Servicios', href: '/servicios', icon: Info },
 ];
 
 const bottomNavigation = [
     { name: 'Dispositivos GPS', href: '/gps', icon: MapPin },
+    { name: 'Zonas Geofencing', href: '/zonas-geofencing', icon: Map },
     { name: 'Días', href: '/dias', icon: Calendar },
     { name: 'Configuración', href: '/configuracion', icon: Settings },
 ];
